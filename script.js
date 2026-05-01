@@ -1,125 +1,92 @@
 const input = document.getElementById('foodImageInput');
 const preview = document.getElementById('previewImage');
-const results = document.getElementById('mealResults');
+const scanStatus = document.getElementById('scanStatus');
+const scanResults = document.getElementById('scanResults');
 const metrics = document.getElementById('metrics');
+const mealResults = document.getElementById('mealResults');
 
-input.addEventListener('change', (event) => {
-  const file = event.target.files?.[0];
+let imageDataUrl = '';
+input.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
   if (!file) return;
-  const url = URL.createObjectURL(file);
-  preview.src = url;
-  preview.hidden = false;
+  const reader = new FileReader();
+  reader.onload = () => {
+    imageDataUrl = reader.result;
+    preview.src = imageDataUrl;
+    preview.hidden = false;
+  };
+  reader.readAsDataURL(file);
 });
 
-const mealLibrary = {
-  healthy: [
-    {
-      name: 'Grilled Salmon Quinoa Bowl', calories: 620, healthRating: 9,
-      ingredients: ['150g salmon fillet', '1 cup cooked quinoa', 'spinach', 'cherry tomatoes', 'olive oil', 'lemon', 'garlic'],
-      recipe: 'A high-protein omega-3 rich bowl with complex carbs and micronutrients.',
-      steps: ['Season salmon with garlic, lemon, and pepper.', 'Grill salmon 4-5 mins each side.', 'Assemble quinoa, greens, and tomatoes.', 'Top with salmon and drizzle olive oil.']
-    },
-    {
-      name: 'Turkey Veggie Stir-Fry', calories: 540, healthRating: 8,
-      ingredients: ['lean turkey strips', 'broccoli', 'bell pepper', 'carrot', 'soy sauce', 'ginger', 'brown rice'],
-      recipe: 'Lean protein stir-fry for satiety and lower-fat macros.',
-      steps: ['Cook turkey in pan until browned.', 'Add vegetables and stir-fry 5-6 minutes.', 'Add soy + ginger.', 'Serve over brown rice.']
-    }
-  ],
-  cheat: [
-    {
-      name: 'Loaded BBQ Cheeseburger Plate', calories: 1050, healthRating: 3,
-      ingredients: ['beef patty', 'brioche bun', 'cheddar', 'bbq sauce', 'onion rings', 'potato wedges'],
-      recipe: 'High-calorie comfort meal suitable for indulgence or bulking days.',
-      steps: ['Grill burger patty to desired doneness.', 'Toast bun and assemble with cheese + sauce.', 'Bake or fry sides.', 'Serve hot with extra sauce.']
-    },
-    {
-      name: 'Creamy Chicken Alfredo Pasta', calories: 980, healthRating: 4,
-      ingredients: ['fettuccine', 'chicken breast', 'heavy cream', 'parmesan', 'butter', 'garlic'],
-      recipe: 'Rich pasta option with high energy density.',
-      steps: ['Cook pasta until al dente.', 'Pan-sear chicken and slice.', 'Make sauce with butter, cream, and parmesan.', 'Combine pasta, sauce, and chicken.']
-    }
-  ]
-};
-mealLibrary.mixed = [...mealLibrary.healthy, ...mealLibrary.cheat];
-
-function calculateBmi(heightCm, weightKg) {
-  return weightKg / ((heightCm / 100) ** 2);
+function fallbackVisionEstimate() {
+  return {
+    identified_foods: ['Mixed meal (fallback estimate)'],
+    estimated_total_calories: 650,
+    macros: { protein_g: 35, carbs_g: 70, fat_g: 25 },
+    confidence: 'low',
+    notes: 'No API key provided, this is a demo estimate. Add an OpenAI API key for real vision analysis.'
+  };
 }
 
-function calculateTdee({ sex, weight, height, age, activity }) {
-  const bmr = sex === 'male'
-    ? 10 * weight + 6.25 * height - 5 * age + 5
-    : 10 * weight + 6.25 * height - 5 * age - 161;
-  return Math.round(bmr * activity);
-}
-
-function inferGoalFromBmi(bmi) {
-  if (bmi < 18.5) return 'gain';
-  if (bmi < 25) return 'maintain';
-  return 'lose';
-}
-
-function targetCalories(baseTdee, goal) {
-  if (goal === 'lose') return baseTdee - 450;
-  if (goal === 'gain') return baseTdee + 350;
-  return baseTdee;
-}
-
-function scoreMealFit(mealCalories, goalCalories) {
-  const diff = Math.abs(mealCalories - goalCalories / 3);
-  return Math.max(0, 100 - Math.round((diff / (goalCalories / 3)) * 100));
-}
-
-function renderMeals(meals, dailyCalories) {
-  results.innerHTML = '';
-  meals.forEach((meal) => {
-    const fit = scoreMealFit(meal.calories, dailyCalories);
-    const el = document.createElement('article');
-    el.className = 'meal';
-    el.innerHTML = `
-      <h3>${meal.name}</h3>
-      <p><strong>Estimated Calories:</strong> ${meal.calories}</p>
-      <p class="rating">Healthiness: ${meal.healthRating}/10</p>
-      <p><strong>Meal fit score for your goal:</strong> ${fit}/100</p>
-      <p><strong>Recipe:</strong> ${meal.recipe}</p>
-      <p><strong>Ingredients:</strong></p>
-      <ul>${meal.ingredients.map((i) => `<li>${i}</li>`).join('')}</ul>
-      <p><strong>Cook instructions:</strong></p>
-      <ol>${meal.steps.map((s) => `<li>${s}</li>`).join('')}</ol>
-    `;
-    results.appendChild(el);
+async function analyzeWithOpenAI(apiKey, model) {
+  const prompt = `Identify foods in this image and estimate nutrition. Return strict JSON with keys: identified_foods (string[]), estimated_total_calories (number), macros {protein_g, carbs_g, fat_g}, confidence (low|medium|high), notes (string).`;
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_image', image_url: imageDataUrl }] }],
+      text: { format: { type: 'json_object' } }
+    })
   });
+  if (!res.ok) throw new Error(`OpenAI error ${res.status}`);
+  const data = await res.json();
+  const raw = data.output_text || '{}';
+  return JSON.parse(raw);
 }
 
-document.getElementById('generateBtn').addEventListener('click', () => {
-  const height = Number(document.getElementById('height').value);
-  const weight = Number(document.getElementById('weight').value);
-  const age = Number(document.getElementById('age').value);
-  const sex = document.getElementById('sex').value;
-  const activity = Number(document.getElementById('activity').value);
-  const goalMode = document.getElementById('goalMode').value;
-  const manualCalories = Number(document.getElementById('manualCalories').value);
-  const mealStyle = document.getElementById('mealStyle').value;
+function renderScan(result) {
+  scanResults.innerHTML = `<article class="scan-card">
+    <h3>Detected Foods</h3><p>${(result.identified_foods || []).join(', ')}</p>
+    <p><strong>Estimated Calories:</strong> ${result.estimated_total_calories ?? 'n/a'} kcal</p>
+    <p><strong>Macros:</strong> Protein ${result.macros?.protein_g ?? '?'}g • Carbs ${result.macros?.carbs_g ?? '?'}g • Fat ${result.macros?.fat_g ?? '?'}g</p>
+    <p class="rating">Confidence: ${result.confidence || 'unknown'}</p>
+    <p>${result.notes || ''}</p>
+  </article>`;
+}
 
-  if (!height || !weight || !age) {
-    metrics.textContent = 'Please fill in height, weight, and age.';
-    return;
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  if (!imageDataUrl) return (scanStatus.textContent = 'Please upload an image first.');
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('model').value;
+  scanStatus.textContent = 'Analyzing image...';
+  try {
+    const result = apiKey ? await analyzeWithOpenAI(apiKey, model) : fallbackVisionEstimate();
+    renderScan(result);
+    scanStatus.textContent = 'Analysis complete.';
+  } catch (err) {
+    scanStatus.textContent = `Analysis failed: ${err.message}. Showing fallback estimate.`;
+    renderScan(fallbackVisionEstimate());
   }
+});
 
-  const bmi = calculateBmi(height, weight);
-  const autoGoal = inferGoalFromBmi(bmi);
-  const chosenGoal = goalMode === 'auto' ? autoGoal : goalMode;
-  const tdee = calculateTdee({ sex, weight, height, age, activity });
-  const suggestedCalories = manualCalories || targetCalories(tdee, chosenGoal);
+const mealLibrary = { healthy:[{name:'Grilled Salmon Quinoa Bowl',calories:620,healthRating:9,ingredients:['salmon','quinoa','spinach','tomatoes','olive oil'],recipe:'Omega-3 rich protein bowl.',steps:['Season salmon','Grill salmon','Assemble bowl','Serve']},{name:'Turkey Veggie Stir-Fry',calories:540,healthRating:8,ingredients:['turkey','broccoli','peppers','carrots','brown rice'],recipe:'Lean high-satiety stir-fry.',steps:['Cook turkey','Add veggies','Season','Serve over rice']}], cheat:[{name:'Loaded BBQ Cheeseburger Plate',calories:1050,healthRating:3,ingredients:['beef','brioche bun','cheddar','bbq sauce','wedges'],recipe:'Indulgent high-calorie option.',steps:['Grill patty','Assemble burger','Cook sides','Serve']},{name:'Chicken Alfredo Pasta',calories:980,healthRating:4,ingredients:['pasta','chicken','cream','parmesan'],recipe:'Rich pasta for cheat/bulk days.',steps:['Boil pasta','Cook chicken','Make sauce','Combine']}]};
+mealLibrary.mixed=[...mealLibrary.healthy,...mealLibrary.cheat];
+const bmi=(h,w)=>w/((h/100)**2); const tdee=({sex,weight,height,age,activity})=>Math.round(((sex==='male')?10*weight+6.25*height-5*age+5:10*weight+6.25*height-5*age-161)*activity);
+const infer=(b)=>b<18.5?'gain':b<25?'maintain':'lose'; const target=(base,g)=>g==='lose'?base-450:g==='gain'?base+350:base;
+const fit=(meal,goal)=>Math.max(0,100-Math.round((Math.abs(meal-goal/3)/(goal/3))*100));
 
-  metrics.innerHTML = `
-    <p><strong>BMI:</strong> ${bmi.toFixed(1)} (${autoGoal} suggested in auto mode)</p>
-    <p><strong>TDEE estimate:</strong> ${tdee} kcal/day</p>
-    <p><strong>Daily calorie target:</strong> ${suggestedCalories} kcal/day (${chosenGoal} mode)</p>
-  `;
+function renderMeals(meals, daily) {
+  mealResults.innerHTML='';
+  meals.forEach((m)=>{const s=fit(m.calories,daily); const el=document.createElement('article'); el.className='meal'; el.innerHTML=`<h3>${m.name}</h3><p><strong>Calories:</strong> ${m.calories}</p><p class="rating">Healthiness: ${m.healthRating}/10</p><p><strong>Goal fit:</strong> ${s}/100</p><p>${m.recipe}</p><p><strong>Ingredients:</strong></p><ul>${m.ingredients.map(i=>`<li>${i}</li>`).join('')}</ul><p><strong>Cook instructions:</strong></p><ol>${m.steps.map(i=>`<li>${i}</li>`).join('')}</ol>`; mealResults.appendChild(el);});
+}
 
-  const pool = mealLibrary[mealStyle];
-  const sorted = [...pool].sort((a, b) => scoreMealFit(b.calories, suggestedCalories) - scoreMealFit(a.calories, suggestedCalories));
-  renderMeals(sorted, suggestedCalories);
+document.getElementById('generateBtn').addEventListener('click',()=>{
+  const height=+document.getElementById('height').value, weight=+document.getElementById('weight').value, age=+document.getElementById('age').value;
+  const sex=document.getElementById('sex').value, activity=+document.getElementById('activity').value, goalMode=document.getElementById('goalMode').value;
+  const manual=+document.getElementById('manualCalories').value, style=document.getElementById('mealStyle').value;
+  if(!height||!weight||!age) return (metrics.textContent='Please fill in height, weight, and age.');
+  const b=bmi(height,weight), auto=infer(b), chosen=goalMode==='auto'?auto:goalMode, base=tdee({sex,weight,height,age,activity}), cals=manual||target(base,chosen);
+  metrics.innerHTML=`<p><strong>BMI:</strong> ${b.toFixed(1)} (${auto} in auto mode)</p><p><strong>TDEE:</strong> ${base} kcal/day</p><p><strong>Target:</strong> ${cals} kcal/day (${chosen})</p>`;
+  const sorted=[...mealLibrary[style]].sort((a,b)=>fit(b.calories,cals)-fit(a.calories,cals)); renderMeals(sorted,cals);
 });

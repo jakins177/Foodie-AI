@@ -3,78 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cal AI Web Clone - Meal Planner</title>
+    <title>Cal AI Web Clone</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="hero">
-      <h1>Cal AI Web</h1>
-      <p>Upload food photos, estimate calorie goals, and get personalized meal suggestions.</p>
+      <p class="badge">Cal AI-inspired Web Clone</p>
+      <h1>Track calories with a picture.</h1>
+      <p>
+        Upload a food photo, run AI vision for nutrition estimates, then use the optional meal planner for healthy or cheat meal ideas.
+      </p>
+      <div class="feature-chips">
+        <span>Photo meal scan</span><span>Barcode/manual (coming soon)</span><span>Macro tracking</span><span>Meal planning add-on</span>
+      </div>
     </header>
 
     <main class="container">
       <section class="card">
-        <h2>1) Food Photo Upload</h2>
-        <p>Upload a meal picture (camera not required for this web version).</p>
-        <input id="foodImageInput" type="file" accept="image/*" />
-        <div class="preview-wrap">
-          <img id="previewImage" alt="Meal preview" hidden />
+        <h2>1) AI Food Scan (Core Cal AI-style flow)</h2>
+        <p>Upload a meal image and analyze with AI vision to identify foods + estimated calories/macros.</p>
+        <div class="grid">
+          <label>OpenAI API Key (optional for real AI)
+            <input id="apiKey" type="password" placeholder="sk-..." />
+          </label>
+          <label>Model
+            <select id="model">
+              <option value="gpt-4.1-mini" selected>gpt-4.1-mini</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+            </select>
+          </label>
         </div>
+        <input id="foodImageInput" type="file" accept="image/*" />
+        <div class="preview-wrap"><img id="previewImage" alt="Meal preview" hidden /></div>
+        <button id="analyzeBtn">Analyze Food Photo</button>
+        <div id="scanStatus" class="status"></div>
+        <div id="scanResults" class="results"></div>
       </section>
 
       <section class="card">
-        <h2>2) Body + Goal Inputs</h2>
+        <h2>2) Meal Planner (Addition)</h2>
+        <p>Separate feature: suggest meals based on BMI/calorie goals + healthy or cheat preference.</p>
         <div class="grid">
-          <label>Height (cm)
-            <input id="height" type="number" min="80" max="250" placeholder="175" />
-          </label>
-          <label>Weight (kg)
-            <input id="weight" type="number" min="25" max="300" placeholder="70" />
-          </label>
-          <label>Age
-            <input id="age" type="number" min="12" max="100" placeholder="30" />
-          </label>
+          <label>Height (cm)<input id="height" type="number" min="80" max="250" placeholder="175" /></label>
+          <label>Weight (kg)<input id="weight" type="number" min="25" max="300" placeholder="70" /></label>
+          <label>Age<input id="age" type="number" min="12" max="100" placeholder="30" /></label>
           <label>Sex
-            <select id="sex">
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
+            <select id="sex"><option value="male">Male</option><option value="female">Female</option></select>
           </label>
           <label>Activity Level
-            <select id="activity">
-              <option value="1.2">Sedentary</option>
-              <option value="1.375">Lightly active</option>
-              <option value="1.55" selected>Moderately active</option>
-              <option value="1.725">Very active</option>
-              <option value="1.9">Athlete</option>
-            </select>
+            <select id="activity"><option value="1.2">Sedentary</option><option value="1.375">Lightly active</option><option value="1.55" selected>Moderately active</option><option value="1.725">Very active</option><option value="1.9">Athlete</option></select>
           </label>
           <label>Goal Mode
-            <select id="goalMode">
-              <option value="auto" selected>Auto (based on BMI)</option>
-              <option value="lose">Lose Weight</option>
-              <option value="maintain">Maintain</option>
-              <option value="gain">Gain Weight</option>
-            </select>
+            <select id="goalMode"><option value="auto" selected>Auto (BMI-based)</option><option value="lose">Lose Weight</option><option value="maintain">Maintain</option><option value="gain">Gain Weight</option></select>
           </label>
-          <label>Desired Daily Calories (optional)
-            <input id="manualCalories" type="number" min="1000" max="6000" placeholder="e.g. 2200" />
-          </label>
+          <label>Desired Daily Calories (optional)<input id="manualCalories" type="number" min="1000" max="6000" placeholder="2200" /></label>
           <label>Suggestion Preference
-            <select id="mealStyle">
-              <option value="healthy" selected>Healthy meals</option>
-              <option value="cheat">Cheat meals</option>
-              <option value="mixed">Mixed</option>
-            </select>
+            <select id="mealStyle"><option value="healthy" selected>Healthy meals</option><option value="cheat">Cheat meals</option><option value="mixed">Mixed</option></select>
           </label>
         </div>
-        <button id="generateBtn">Generate Meal Plan</button>
-        <div id="metrics" class="metrics"></div>
-      </section>
-
-      <section class="card">
-        <h2>3) Meal Suggestions</h2>
-        <p>Includes ingredients, recipe overview, cook instructions, and healthiness rating.</p>
+        <button id="generateBtn">Generate Meal Suggestions</button>
+        <div id="metrics" class="status"></div>
         <div id="mealResults" class="results"></div>
       </section>
     </main>
