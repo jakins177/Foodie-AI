@@ -10,8 +10,31 @@ const generateBtn = document.getElementById('generateBtn');
 const hasScanUi = input && preview && scanStatus && scanResults && analyzeBtn;
 const hasMealUi = metrics && mealResults && generateBtn;
 
+function appLog(level, message, details) {
+  const fn = level === 'error' ? console.error : console.info;
+  fn(`[Foodie AI] ${message}`, details || '');
+}
+
+window.addEventListener('error', (event) => {
+  appLog('error', 'Global error captured', {
+    message: event.message,
+    source: event.filename,
+    line: event.lineno,
+    column: event.colno
+  });
+
+  if (typeof event.filename === 'string' && event.filename.startsWith('chrome-extension://')) {
+    appLog('info', 'This error comes from a browser extension, not app code.', event.filename);
+  }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  appLog('error', 'Unhandled promise rejection', event.reason);
+});
+
 let imageDataUrl = '';
 if (hasScanUi) {
+  appLog('info', 'Scan UI initialized.');
   input.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -91,6 +114,7 @@ function renderMeals(meals, daily) {
 }
 
 if (hasMealUi) {
+  appLog('info', 'Meal planner UI initialized.');
   generateBtn.addEventListener('click',()=>{
     const height=+document.getElementById('height').value, weight=+document.getElementById('weight').value, age=+document.getElementById('age').value;
     const sex=document.getElementById('sex').value, activity=+document.getElementById('activity').value, goalMode=document.getElementById('goalMode').value;
